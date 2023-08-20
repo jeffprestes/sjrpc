@@ -62,6 +62,12 @@ It will start a localhost Web Server on port 8434. This port number is fixed to 
 
 Configure your Foundry, Truffle, Go, Hardhat or any Web3 application to use this RPC server: `http://localhost:8434`.
 
+### Clean Up
+
+When you need to call another Blockchain network your cache gets outdate and you need to clean it up. To do so you need to call the `cleanup` endpoint:
+
+http://localhost:8434/cleanup
+
 ## Perfomance hint
 
 It runs better in 64-bit architect processors, such M1/M2 Apple chips, or Intel i7. The reason is it uses Blake2b 512 bits.
