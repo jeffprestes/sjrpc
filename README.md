@@ -1,6 +1,6 @@
 # Save JSON-RPC
 
-sjrpc or **Save JSON-RPC** is a Reverse Proxy focused on reduce remote EVM JSON-RPC calls
+**sjrpc** or **Save JSON-RPC** is a Reverse Proxy focused on to reduce remote Ethereum/Web3 JSON-RPC calls to thrid-party nodes.
 
 ## How it works
 
