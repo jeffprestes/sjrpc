@@ -37,7 +37,6 @@ func PostHandler(echoCtx echo.Context) error {
 
 	if request.IsCacheable() {
 		resp, err = database.DB.Get(database.RequestNamespace, request.Hash())
-		log.Println("request.IsCacheable", resp, err)
 		if err == badger.ErrKeyNotFound {
 			tmpResp := new(bytes.Buffer)
 			err = requests.URL(RpcUrl).BodyJSON(request).ContentType("application/json").ToBytesBuffer(tmpResp).Fetch(echoCtx.Request().Context())

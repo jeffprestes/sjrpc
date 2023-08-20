@@ -32,6 +32,8 @@ func main() {
 		return c.HTML(http.StatusOK, "Hello, This is Save JSON-RPC")
 	})
 
+	webserver.GET("/cleanup", handler.DbCleanHandler)
+
 	webserver.POST("/", handler.PostHandler)
 
 	httpPort := "8434"

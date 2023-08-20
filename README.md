@@ -68,4 +68,5 @@ It runs better in 64-bit architect processors, such M1/M2 Apple chips, or Intel 
 
 ## TODOs
 
-- Create a download session to avoid users need to install Go 
+- Create a download session to avoid users need to install Go
+- Manage block creation time to allow to cache requests that uses `latest` param meanwhile a new block is not generated.
