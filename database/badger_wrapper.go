@@ -155,6 +155,40 @@ func (bdb *BadgerDB) Close() error {
 	return bdb.db.Close()
 }
 
+// TODO: Implement Delete function
+// TODO: Test both and check performance
+/*
+
+func (bdb *BadgerDB) Delete(key []byte) error {
+ wb := bdb.db.NewWriteBatch()
+ defer wb.Cancel()
+ err := wb.Delete(key)
+ if err != nil {
+  return err
+ }
+ return wb.Flush()
+}
+
+or
+
+func (bdb *BadgerDB) DeleteFoo(ctx context.Context, fooKey string) error {
+ return bdb.db.Update(func(txn *badger.Txn) error {
+  _, err := txn.Get([]byte(fooKey))
+  if errors.Is(err, badger.ErrKeyNotFound) {
+   return fmt.Errorf("error deleting foo with ID '%s': %w", fooKey, repo.ErrRecordNotFound)
+  } else if err != nil {
+   return fmt.Errorf("error deleting foo with ID '%s': %w", fooKey, err)
+  }
+  err = txn.Delete([]byte(fooKey))
+  if err != nil {
+   return fmt.Errorf("error removing foo with ID '%s' from db: %w", fooKey, err)
+  }
+  return nil
+ })
+}
+
+*/
+
 // runGC triggers the garbage collection for the BadgerDB backend database. It
 // should be run in a goroutine.
 func (bdb *BadgerDB) runGC() {
