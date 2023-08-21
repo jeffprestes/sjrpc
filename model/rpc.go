@@ -8,10 +8,10 @@ import (
 )
 
 type RPCRequest struct {
-	JsonRpcVersion string   `json:"jsonrpc"`
-	Method         string   `json:"method"`
-	Params         []string `json:"params"`
-	ID             int      `json:"id"`
+	JsonRpcVersion string `json:"jsonrpc"`
+	Method         string `json:"method"`
+	Params         []any  `json:"params"`
+	ID             int    `json:"id"`
 }
 
 func (rpc *RPCRequest) ToByte() (data []byte) {
@@ -42,12 +42,21 @@ func (rpc *RPCRequest) IsCacheable() (resp bool) {
 		"eth_getBlockTransactionCountByHash",
 		"eth_getBlockTransactionCountByNumber":
 		resp = true
+	}
+	return
+}
+
+func (rpc *RPCRequest) IsTimelyCacheable() (resp bool) {
+	switch rpc.Method {
 	case "eth_getLogs", "eth_getCode", "eth_feeHistory", "eth_getStorageAt", "eth_getBalance":
 		thereIsLatest := false
-		for _, param := range rpc.Params {
-			if strings.ToLower(param) == "latest" {
-				thereIsLatest = true
-				break
+		for _, tmpParam := range rpc.Params {
+			param, isString := tmpParam.(string)
+			if isString {
+				if strings.ToLower(param) == "latest" {
+					thereIsLatest = true
+					break
+				}
 			}
 		}
 		resp = !thereIsLatest
