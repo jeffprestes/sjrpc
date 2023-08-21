@@ -38,17 +38,38 @@ func PostHandler(echoCtx echo.Context) error {
 	if request.IsCacheable() {
 		resp, err = database.DB.Get(database.RequestNamespace, request.Hash())
 		if err == badger.ErrKeyNotFound {
-			tmpResp := new(bytes.Buffer)
-			err = requests.URL(RpcUrl).BodyJSON(request).ContentType("application/json").ToBytesBuffer(tmpResp).Fetch(echoCtx.Request().Context())
+			resp, err = PerformRemoteCall(echoCtx, request)
 			if err != nil {
 				return err
 			}
-			resp = tmpResp.String()
 			database.DB.Insert(database.RequestNamespace, request.Hash(), []byte(resp))
 		} else if err != nil {
+			return err
+		}
+	} else if request.IsTimelyCacheable() {
+		resp, err = PerformRemoteCall(echoCtx, request)
+		if err != nil {
+			return err
+		}
+	} else {
+		resp, err = PerformRemoteCall(echoCtx, request)
+		if err != nil {
 			return err
 		}
 	}
 	echoCtx.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
 	return echoCtx.String(http.StatusOK, resp)
+}
+
+func PerformRemoteCall(echoCtx echo.Context, request *model.RPCRequest) (resp string, err error) {
+	tmpResp := new(bytes.Buffer)
+	err = requests.URL(RpcUrl).BodyJSON(request).ContentType("application/json").ToBytesBuffer(tmpResp).Fetch(echoCtx.Request().Context())
+	if err != nil {
+		return
+	}
+	resp = tmpResp.String()
+	return
+}
+
+func GetLatestBlockInfo() {
 }
