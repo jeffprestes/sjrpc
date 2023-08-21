@@ -4,6 +4,7 @@
 # Binaries for programs and plugins
 *.exe
 *.exe~
+!sjrpc-*.exe
 *.dll
 *.so
 *.dylib
