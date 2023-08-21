@@ -27,9 +27,17 @@ func main() {
 	webserver := echo.New()
 	webserver.Use(middleware.Logger())
 	webserver.Use(middleware.Recover())
+	webserver.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*", "https://remix.ethereum.org"},
+		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept},
+	}))
 
 	webserver.GET("/", func(c echo.Context) error {
 		return c.HTML(http.StatusOK, "Hello, This is Save JSON-RPC")
+	})
+
+	webserver.OPTIONS("/", func(c echo.Context) error {
+		return c.HTML(http.StatusOK, "")
 	})
 
 	webserver.GET("/cleanup", handler.DbCleanHandler)
