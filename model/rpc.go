@@ -1,8 +1,9 @@
 package model
 
 import (
+	"encoding/base64"
 	"encoding/json"
-	"strings"
+	"time"
 
 	"golang.org/x/crypto/blake2b"
 )
@@ -23,6 +24,12 @@ func (rpc *RPCRequest) Hash() (hash []byte) {
 	data := rpc.ToByte()
 	tmp := blake2b.Sum512(data)
 	hash = tmp[:] // blake2b.Sum2
+	return
+}
+
+func (rpc *RPCRequest) Base64Hash() (hash string) {
+	byteHash := rpc.Hash()
+	hash = base64.StdEncoding.EncodeToString(byteHash)
 	return
 }
 
@@ -49,17 +56,24 @@ func (rpc *RPCRequest) IsCacheable() (resp bool) {
 func (rpc *RPCRequest) IsTimelyCacheable() (resp bool) {
 	switch rpc.Method {
 	case "eth_getLogs", "eth_getCode", "eth_feeHistory", "eth_getStorageAt", "eth_getBalance":
-		thereIsLatest := false
-		for _, tmpParam := range rpc.Params {
-			param, isString := tmpParam.(string)
-			if isString {
-				if strings.ToLower(param) == "latest" {
-					thereIsLatest = true
-					break
-				}
-			}
-		}
-		resp = !thereIsLatest
+		resp = true
+	}
+	return
+}
+
+type EphemeralRequest struct {
+	Base64Hash  []byte
+	Request     RPCRequest
+	Response    string
+	BlockNumber uint64
+	When        int64
+}
+
+func (erpc *EphemeralRequest) IsStillValid() (ok bool) {
+	now := time.Now().UTC().Unix()
+	max := erpc.When + 12
+	if now <= max {
+		ok = true
 	}
 	return
 }

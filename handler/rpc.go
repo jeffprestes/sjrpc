@@ -2,7 +2,9 @@ package handler
 
 import (
 	"bytes"
+	"fmt"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
 	"strings"
@@ -10,6 +12,7 @@ import (
 	"github.com/carlmjohnson/requests"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/jeffprestes/sjrpc/database"
+	"github.com/jeffprestes/sjrpc/localcache"
 	"github.com/jeffprestes/sjrpc/model"
 	"github.com/labstack/echo"
 )
@@ -25,14 +28,11 @@ func init() {
 
 func PostHandler(echoCtx echo.Context) error {
 	var err error
-
 	request := new(model.RPCRequest)
-
 	err = echoCtx.Bind(request)
 	if err != nil {
 		return err
 	}
-
 	var resp string
 
 	if request.IsCacheable() {
@@ -47,10 +47,32 @@ func PostHandler(echoCtx echo.Context) error {
 			return err
 		}
 	} else if request.IsTimelyCacheable() {
-		resp, err = PerformRemoteCall(echoCtx, request)
-		if err != nil {
-			return err
+		var respObj model.EphemeralRequest
+		tmpObj, ok := localcache.TimelyRequests.Load(request.Base64Hash())
+		if !ok {
+			respObj, err = PerformRemoteCallForTimelyEndpoints(echoCtx, request)
+			if err != nil {
+				return err
+			}
+			localcache.TimelyRequests.Store(request.Base64Hash(), respObj)
+		} else {
+			log.Println("Request base64hash: ", request.Base64Hash())
+			respObj = tmpObj.(model.EphemeralRequest)
+			if !respObj.IsStillValid() {
+				respObj, err = PerformRemoteCallForTimelyEndpoints(echoCtx, request)
+				if err != nil {
+					return err
+				}
+				_, swapped := localcache.TimelyRequests.Swap(request.Base64Hash(), respObj)
+				if swapped {
+					log.Println(request.Base64Hash(), " has been updated")
+				}
+			}
+			// now := time.Now().UTC().Unix()
+			// max := respObj.When + 12
+			// log.Println("now: ", now, "-", "max:", max, " - valid?", now <= max)
 		}
+		resp = respObj.Response
 	} else {
 		resp, err = PerformRemoteCall(echoCtx, request)
 		if err != nil {
@@ -71,5 +93,85 @@ func PerformRemoteCall(echoCtx echo.Context, request *model.RPCRequest) (resp st
 	return
 }
 
-func GetLatestBlockInfo() {
+func GetLatestBlockInfo(echoCtx echo.Context) (resp model.BlockByNumberResponse, err error) {
+	var request model.RPCRequest
+	request.JsonRpcVersion = "2.0"
+	request.Method = "eth_blockNumber"
+	request.ID = 1
+
+	blockNumberResp := new(model.BlockNumberResponse)
+	err = requests.URL(RpcUrl).BodyJSON(request).ContentType("application/json").ToJSON(blockNumberResp).Fetch(echoCtx.Request().Context())
+	if err != nil {
+		return
+	}
+
+	request.JsonRpcVersion = "2.0"
+	request.Method = "eth_getBlockByNumber"
+	request.ID = 1
+	request.Params = append(request.Params, blockNumberResp.Result)
+	request.Params = append(request.Params, true)
+	blockByNumberResp := new(model.BlockByNumberResponse)
+	err = requests.URL(RpcUrl).BodyJSON(request).ContentType("application/json").ToJSON(blockByNumberResp).Fetch(echoCtx.Request().Context())
+	if err != nil {
+		return
+	}
+	resp = *blockByNumberResp
+	return
+}
+
+func GetLatestBlockTimestamp(echoCtx echo.Context) (timestamp uint64, err error) {
+	block, err := GetLatestBlockInfo(echoCtx)
+	if err != nil {
+		return
+	}
+	tmpInt, ok := big.NewInt(0).SetString(block.Result.Timestamp, 16)
+	if !ok {
+		err = fmt.Errorf("block timestamp %s conversion error", block.Result.Timestamp)
+		return
+	}
+	timestamp = tmpInt.Uint64()
+	return
+}
+
+func PerformRemoteCallForTimelyEndpoints(echoCtx echo.Context, request *model.RPCRequest) (respObj model.EphemeralRequest, err error) {
+	var lastBlock model.BlockByNumberResponse
+	lastBlock, err = GetLatestBlockInfo(echoCtx)
+	if err != nil {
+		return
+	}
+	respObj.BlockNumber = ConvertStrRespToUInt64(lastBlock.Result.Number)
+	if respObj.BlockNumber < 1000 {
+		err = fmt.Errorf("could not convert block number to int: %s", lastBlock.Result.Number)
+		return
+	}
+	respObj.When = ConvertStrRespToInt64(lastBlock.Result.Timestamp)
+	if respObj.When < 1000 {
+		err = fmt.Errorf("could not convert block number to timestamp: %s", lastBlock.Result.Timestamp)
+		return
+	}
+	newResp, err := PerformRemoteCall(echoCtx, request)
+	if err != nil {
+		return
+	}
+	respObj.Request = *request
+	respObj.Response = newResp
+	return
+}
+
+func ConvertStrRespToInt64(strNumber string) (value int64) {
+	tmpStr, _ := strings.CutPrefix(strNumber, "0x")
+	tmpInt, ok := new(big.Int).SetString(tmpStr, 16)
+	if ok {
+		value = tmpInt.Int64()
+	}
+	return
+}
+
+func ConvertStrRespToUInt64(strNumber string) (value uint64) {
+	tmpStr, _ := strings.CutPrefix(strNumber, "0x")
+	tmpInt, ok := new(big.Int).SetString(tmpStr, 16)
+	if ok {
+		value = tmpInt.Uint64()
+	}
+	return
 }

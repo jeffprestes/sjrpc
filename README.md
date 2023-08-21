@@ -83,4 +83,4 @@ It runs better in 64-bit architect processors, such M1/M2 Apple chips, or Intel 
 
 ## TODOs
 
-- Manage block creation time to allow to cache requests that uses `latest` param meanwhile a new block is not generated.
+- Add chainID as parameter to support different blockchains networks simultaneously.
