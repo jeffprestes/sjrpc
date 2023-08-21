@@ -17,23 +17,42 @@ import (
 	"github.com/labstack/echo"
 )
 
-var RpcUrl string
+var (
+	RpcUrl string
+	debug  bool
+)
 
 func init() {
 	if len(strings.TrimSpace(os.Getenv("SJRPC_URL"))) < 5 {
 		log.Fatalln("no SJRPC_URL server set in environment variable")
 	}
 	RpcUrl = os.Getenv("SJRPC_URL")
+	debug = true
 }
 
 func PostHandler(echoCtx echo.Context) error {
 	var err error
+	echoCtx.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
+
+	if echoCtx.Request().ContentLength <= 237 {
+		return echoCtx.String(http.StatusOK, "")
+	}
+
 	request := new(model.RPCRequest)
 	err = echoCtx.Bind(request)
 	if err != nil {
+		log.Printf("request: %+v", echoCtx.Request())
 		return err
 	}
 	var resp string
+	cacheUsed := true
+	requestHash := request.Base64Hash()
+
+	if cacheUsed && debug {
+		log.Print("\n\n")
+		log.Println(" +++ request: ", requestHash)
+		log.Print("\n\n")
+	}
 
 	if request.IsCacheable() {
 		resp, err = database.DB.Get(database.RequestNamespace, request.Hash())
@@ -43,8 +62,17 @@ func PostHandler(echoCtx echo.Context) error {
 				return err
 			}
 			database.DB.Insert(database.RequestNamespace, request.Hash(), []byte(resp))
+			cacheUsed = false
 		} else if err != nil {
 			return err
+		}
+	} else if request.IsEnvCacheable() {
+		if strings.ToLower(request.Method) == "eth_accounts" {
+			respJson := model.AccountResponse{}
+			respJson.ID = request.ID
+			respJson.Jsonrpc = request.JsonRpcVersion
+			respJson.Result = append(respJson.Result, os.Getenv("ETH_FROM"))
+			resp = respJson.ToString()
 		}
 	} else if request.IsTimelyCacheable() {
 		var respObj model.EphemeralRequest
@@ -55,6 +83,7 @@ func PostHandler(echoCtx echo.Context) error {
 				return err
 			}
 			localcache.TimelyRequests.Store(request.Base64Hash(), respObj)
+			cacheUsed = false
 		} else {
 			log.Println("Request base64hash: ", request.Base64Hash())
 			respObj = tmpObj.(model.EphemeralRequest)
@@ -67,6 +96,7 @@ func PostHandler(echoCtx echo.Context) error {
 				if swapped {
 					log.Println(request.Base64Hash(), " has been updated")
 				}
+				cacheUsed = false
 			}
 			// now := time.Now().UTC().Unix()
 			// max := respObj.When + 12
@@ -78,6 +108,12 @@ func PostHandler(echoCtx echo.Context) error {
 		if err != nil {
 			return err
 		}
+		cacheUsed = false
+	}
+	if cacheUsed && debug {
+		log.Print("\n\n")
+		log.Println(" *** cache was used for the request: ", requestHash)
+		log.Print("\n\n")
 	}
 	echoCtx.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
 	return echoCtx.String(http.StatusOK, resp)
