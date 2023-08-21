@@ -25,3 +25,5 @@ bin/*
 !bin/placeholder.txt
 database/data/*
 !database/data/placeholder.txt
+
+launch.json
