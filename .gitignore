@@ -27,3 +27,4 @@ database/data/*
 !database/data/placeholder.txt
 
 launch.json
+__debug_*
