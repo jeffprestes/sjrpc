@@ -9,6 +9,15 @@ uses the request hash as Key, perform the remote JSON-RPC call and saves the rem
 
 ## Installation
 
+### Download
+
+- [Mac Silicon]("downloads/sjrpc-v0.1.0-mac-silicon")
+- [Mac Intel]("downloads/sjrpc-v0.1.0-mac-intel")
+- [Linux]("downloads/sjrpc-v0.1.0-linux-amd64")
+- [Windows]("downloads/sjrpc-v0.1.0-windows-amd64.exe")
+
+## Installation from sources
+
 ### Install Go Language
 
 Visit [Golang Download and Install page](https://go.dev/doc/install) and follow the instructions.
@@ -74,5 +83,4 @@ It runs better in 64-bit architect processors, such M1/M2 Apple chips, or Intel 
 
 ## TODOs
 
-- Create a download session to avoid users need to install Go
 - Manage block creation time to allow to cache requests that uses `latest` param meanwhile a new block is not generated.
