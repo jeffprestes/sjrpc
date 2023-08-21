@@ -16,7 +16,10 @@ type RPCRequest struct {
 }
 
 func (rpc *RPCRequest) ToByte() (data []byte) {
+	tmpId := rpc.ID
+	rpc.ID = 1
 	data, _ = json.Marshal(rpc)
+	rpc.ID = tmpId
 	return
 }
 
@@ -56,6 +59,14 @@ func (rpc *RPCRequest) IsCacheable() (resp bool) {
 func (rpc *RPCRequest) IsTimelyCacheable() (resp bool) {
 	switch rpc.Method {
 	case "eth_getLogs", "eth_getCode", "eth_feeHistory", "eth_getStorageAt", "eth_getBalance":
+		resp = true
+	}
+	return
+}
+
+func (rpc *RPCRequest) IsEnvCacheable() (resp bool) {
+	switch rpc.Method {
+	case "eth_accounts":
 		resp = true
 	}
 	return
