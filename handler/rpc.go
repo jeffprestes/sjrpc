@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
@@ -34,12 +35,28 @@ func PostHandler(echoCtx echo.Context) error {
 	var err error
 	echoCtx.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
 
+	contentType := echoCtx.Request().Header["Content-Type"][0]
+	if len(contentType) < 10 || strings.ToLower(contentType) != "application/json" {
+		log.Print("\n")
+		log.Println("********************************************")
+		log.Println("What is echoCtx.Request().Header[Content-Type] ?", echoCtx.Request().Header["Content-Type"][0])
+		log.Println("********************************************")
+		log.Print("\n")
+		err = fmt.Errorf("invalid content-type header: %s", contentType)
+		echoCtx.JSON(http.StatusBadRequest, err)
+		return err
+	}
+
 	request := new(model.RPCRequest)
 	err = echoCtx.Bind(request)
 	if err != nil {
-		log.Printf("request: %+v", echoCtx.Request())
+		var qq any
+		log.Printf("request bind error: %s\n %+v\n\n", err.Error(), echoCtx.Request())
+		errDecode := json.NewDecoder(echoCtx.Request().Body).Decode(&qq)
+		log.Println(errDecode, "- qq:", qq)
 		return err
 	}
+
 	var resp string
 	cacheUsed := true
 	requestHash := request.Base64Hash()
@@ -132,7 +149,6 @@ func PostHandler(echoCtx echo.Context) error {
 		log.Println(" *** cache was used for the request: ", requestHash)
 		log.Print("\n\n")
 	}
-	echoCtx.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
 	return echoCtx.String(http.StatusOK, resp)
 }
 
