@@ -3,6 +3,7 @@ package model
 import (
 	"encoding/base64"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/blake2b"
@@ -38,9 +39,7 @@ func (rpc *RPCRequest) Base64Hash() (hash string) {
 
 func (rpc *RPCRequest) IsCacheable() (resp bool) {
 	switch rpc.Method {
-	case "eth_getTransactionReceipt",
-		"eth_getTransactionCount",
-		"eth_getTransactionByHash",
+	case
 		"eth_getTransactionByBlockNumberAndIndex",
 		"eth_getTransactionByBlockHashAndIndex",
 		"web3_clientVersion",
@@ -56,9 +55,17 @@ func (rpc *RPCRequest) IsCacheable() (resp bool) {
 	return
 }
 
+func (rpc *RPCRequest) IsAfterFinalCacheable() (resp bool) {
+	switch rpc.Method {
+	case "eth_getTransactionReceipt", "eth_getTransactionByHash":
+		resp = true
+	}
+	return
+}
+
 func (rpc *RPCRequest) IsTimelyCacheable() (resp bool) {
 	switch rpc.Method {
-	case "eth_getLogs", "eth_getCode", "eth_feeHistory", "eth_getStorageAt", "eth_getBalance":
+	case "eth_getLogs", "eth_getCode", "eth_getTransactionCount", "eth_feeHistory", "eth_getStorageAt", "eth_getBalance":
 		resp = true
 	}
 	return
@@ -68,6 +75,17 @@ func (rpc *RPCRequest) IsEnvCacheable() (resp bool) {
 	switch rpc.Method {
 	case "eth_accounts":
 		resp = true
+	}
+	return
+}
+
+func (rpc *RPCRequest) IsResultFinal(resp string) (final bool) {
+	final = true
+	if strings.Contains(resp, `"result":null`) ||
+		strings.Contains(resp, `"result": null`) ||
+		strings.Contains(resp, `"blockNumber": null,`) ||
+		strings.Contains(resp, `"blockNumber":null,`) {
+		final = false
 	}
 	return
 }

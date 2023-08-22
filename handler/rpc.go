@@ -34,10 +34,6 @@ func PostHandler(echoCtx echo.Context) error {
 	var err error
 	echoCtx.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
 
-	if echoCtx.Request().ContentLength <= 237 {
-		return echoCtx.String(http.StatusOK, "")
-	}
-
 	request := new(model.RPCRequest)
 	err = echoCtx.Bind(request)
 	if err != nil {
@@ -51,6 +47,7 @@ func PostHandler(echoCtx echo.Context) error {
 	if cacheUsed && debug {
 		log.Print("\n\n")
 		log.Println(" +++ request: ", requestHash)
+		log.Printf("%+v", request)
 		log.Print("\n\n")
 	}
 
@@ -66,6 +63,26 @@ func PostHandler(echoCtx echo.Context) error {
 		} else if err != nil {
 			return err
 		}
+	} else if request.IsAfterFinalCacheable() {
+		resp, err = database.DB.Get(database.RequestNamespace, request.Hash())
+		if err == badger.ErrKeyNotFound {
+			resp, err = PerformRemoteCall(echoCtx, request)
+			if err != nil {
+				return err
+			}
+			if request.IsResultFinal(resp) {
+				database.DB.Insert(database.RequestNamespace, request.Hash(), []byte(resp))
+				cacheUsed = false
+			}
+		} else if err != nil {
+			return err
+		}
+		// if !request.IsResultFinal(resp) {
+		// 	resp, err = PerformRemoteCall(echoCtx, request)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// }
 	} else if request.IsEnvCacheable() {
 		if strings.ToLower(request.Method) == "eth_accounts" {
 			respJson := model.AccountResponse{}
