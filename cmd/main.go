@@ -8,8 +8,8 @@ import (
 
 	"github.com/jeffprestes/sjrpc/database"
 	"github.com/jeffprestes/sjrpc/handler"
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 func main() {
@@ -27,9 +27,9 @@ func main() {
 	webserver := echo.New()
 	webserver.Use(middleware.Logger())
 	webserver.Use(middleware.Recover())
+	webserver.Use(middleware.Decompress())
 	webserver.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"*", "https://remix.ethereum.org"},
-		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept},
+		AllowOrigins: []string{"*"},
 	}))
 
 	webserver.GET("/", func(c echo.Context) error {

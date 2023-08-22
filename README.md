@@ -84,3 +84,5 @@ It runs better in 64-bit architect processors, such M1/M2 Apple chips, or Intel 
 ## TODOs
 
 - Add chainID as parameter to support different blockchains networks simultaneously.
+- To optimize the response removing ID from hash generation, so same requests from different clients can use the same cache,
+but update it back to the original ID of the call to allow SJRPC to be compatible with Ethers.

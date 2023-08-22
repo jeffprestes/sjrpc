@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/jeffprestes/sjrpc/database"
-	"github.com/labstack/echo"
+	"github.com/labstack/echo/v4"
 )
 
 func DbCleanHandler(echoCtx echo.Context) error {

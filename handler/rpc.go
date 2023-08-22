@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"net/http"
@@ -15,7 +16,7 @@ import (
 	"github.com/jeffprestes/sjrpc/database"
 	"github.com/jeffprestes/sjrpc/localcache"
 	"github.com/jeffprestes/sjrpc/model"
-	"github.com/labstack/echo"
+	"github.com/labstack/echo/v4"
 )
 
 var (
@@ -47,109 +48,132 @@ func PostHandler(echoCtx echo.Context) error {
 		return err
 	}
 
-	request := new(model.RPCRequest)
-	err = echoCtx.Bind(request)
-	if err != nil {
-		var qq any
-		log.Printf("request bind error: %s\n %+v\n\n", err.Error(), echoCtx.Request())
-		errDecode := json.NewDecoder(echoCtx.Request().Body).Decode(&qq)
-		log.Println(errDecode, "- qq:", qq)
-		return err
+	body, errReadBytes := io.ReadAll(echoCtx.Request().Body)
+	if errReadBytes != nil {
+		log.Printf("error reading request bytes: %s\n", errReadBytes.Error())
+		return errReadBytes
+	}
+	var requests []model.RPCRequest
+	var request model.RPCRequest
+	errDecode := json.Unmarshal(body, &request)
+	if errDecode != nil {
+		errDecode = json.Unmarshal(body, &requests)
+		if errDecode != nil {
+			log.Printf("decoding request error: %s\n", errDecode.Error())
+			return errDecode
+		}
+		log.Println("Number of requests: ", len(requests))
+	} else {
+		requests = append(requests, request)
 	}
 
+	var respFinal strings.Builder
 	var resp string
 	cacheUsed := true
-	requestHash := request.Base64Hash()
 
-	if cacheUsed && debug {
-		log.Print("\n\n")
-		log.Println(" +++ request: ", requestHash)
-		log.Printf("%+v", request)
-		log.Print("\n\n")
-	}
+	for i := 0; i < len(requests); i++ {
+		request = requests[i]
+		requestHash := request.Base64Hash()
 
-	if request.IsCacheable() {
-		resp, err = database.DB.Get(database.RequestNamespace, request.Hash())
-		if err == badger.ErrKeyNotFound {
-			resp, err = PerformRemoteCall(echoCtx, request)
-			if err != nil {
-				return err
-			}
-			database.DB.Insert(database.RequestNamespace, request.Hash(), []byte(resp))
-			cacheUsed = false
-		} else if err != nil {
-			return err
+		if cacheUsed && debug {
+			log.Print("\n\n")
+			log.Println(" +++ request: ", requestHash)
+			log.Printf("%+v", request)
+			log.Print("\n\n")
 		}
-	} else if request.IsAfterFinalCacheable() {
-		resp, err = database.DB.Get(database.RequestNamespace, request.Hash())
-		if err == badger.ErrKeyNotFound {
-			resp, err = PerformRemoteCall(echoCtx, request)
-			if err != nil {
-				return err
-			}
-			if request.IsResultFinal(resp) {
-				database.DB.Insert(database.RequestNamespace, request.Hash(), []byte(resp))
-				cacheUsed = false
-			}
-		} else if err != nil {
-			return err
-		}
-		// if !request.IsResultFinal(resp) {
-		// 	resp, err = PerformRemoteCall(echoCtx, request)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// }
-	} else if request.IsEnvCacheable() {
-		if strings.ToLower(request.Method) == "eth_accounts" {
-			respJson := model.AccountResponse{}
-			respJson.ID = request.ID
-			respJson.Jsonrpc = request.JsonRpcVersion
-			respJson.Result = append(respJson.Result, os.Getenv("ETH_FROM"))
-			resp = respJson.ToString()
-		}
-	} else if request.IsTimelyCacheable() {
-		var respObj model.EphemeralRequest
-		tmpObj, ok := localcache.TimelyRequests.Load(request.Base64Hash())
-		if !ok {
-			respObj, err = PerformRemoteCallForTimelyEndpoints(echoCtx, request)
-			if err != nil {
-				return err
-			}
-			localcache.TimelyRequests.Store(request.Base64Hash(), respObj)
-			cacheUsed = false
-		} else {
-			log.Println("Request base64hash: ", request.Base64Hash())
-			respObj = tmpObj.(model.EphemeralRequest)
-			if !respObj.IsStillValid() {
-				respObj, err = PerformRemoteCallForTimelyEndpoints(echoCtx, request)
+
+		if request.IsCacheable() {
+			resp, err = database.DB.Get(database.RequestNamespace, request.Hash())
+			if err == badger.ErrKeyNotFound {
+				resp, err = PerformRemoteCall(echoCtx, &request)
 				if err != nil {
 					return err
 				}
-				_, swapped := localcache.TimelyRequests.Swap(request.Base64Hash(), respObj)
-				if swapped {
-					log.Println(request.Base64Hash(), " has been updated")
-				}
+				database.DB.Insert(database.RequestNamespace, request.Hash(), []byte(resp))
 				cacheUsed = false
+			} else if err != nil {
+				return err
 			}
-			// now := time.Now().UTC().Unix()
-			// max := respObj.When + 12
-			// log.Println("now: ", now, "-", "max:", max, " - valid?", now <= max)
+		} else if request.IsAfterFinalCacheable() {
+			resp, err = database.DB.Get(database.RequestNamespace, request.Hash())
+			if err == badger.ErrKeyNotFound {
+				resp, err = PerformRemoteCall(echoCtx, &request)
+				if err != nil {
+					return err
+				}
+				if request.IsResultFinal(resp) {
+					database.DB.Insert(database.RequestNamespace, request.Hash(), []byte(resp))
+					cacheUsed = false
+				}
+			} else if err != nil {
+				return err
+			}
+		} else if request.IsEnvCacheable() {
+			if strings.ToLower(request.Method) == "eth_accounts" {
+				respJson := model.AccountResponse{}
+				respJson.ID = request.ID
+				respJson.Jsonrpc = request.JsonRpcVersion
+				respJson.Result = append(respJson.Result, os.Getenv("ETH_FROM"))
+				resp = respJson.ToString()
+			}
+		} else if request.IsTimelyCacheable() {
+			var respObj model.EphemeralRequest
+			tmpObj, ok := localcache.TimelyRequests.Load(request.Base64Hash())
+			if !ok {
+				respObj, err = PerformRemoteCallForTimelyEndpoints(echoCtx, &request)
+				if err != nil {
+					return err
+				}
+				localcache.TimelyRequests.Store(request.Base64Hash(), respObj)
+				cacheUsed = false
+			} else {
+				log.Println("Request base64hash: ", request.Base64Hash())
+				respObj = tmpObj.(model.EphemeralRequest)
+				if !respObj.IsStillValid() {
+					respObj, err = PerformRemoteCallForTimelyEndpoints(echoCtx, &request)
+					if err != nil {
+						return err
+					}
+					_, swapped := localcache.TimelyRequests.Swap(request.Base64Hash(), respObj)
+					if swapped {
+						log.Println(request.Base64Hash(), " has been updated")
+					}
+					cacheUsed = false
+				}
+			}
+			resp = respObj.Response
+		} else {
+			resp, err = PerformRemoteCall(echoCtx, &request)
+			if err != nil {
+				return err
+			}
+			cacheUsed = false
 		}
-		resp = respObj.Response
-	} else {
-		resp, err = PerformRemoteCall(echoCtx, request)
+		if cacheUsed && debug {
+			log.Print("\n\n")
+			log.Println(" *** cache was used for the request: ", requestHash)
+			log.Print("\n\n")
+		}
+		if len(requests) > 1 {
+			if i > 0 && i < len(requests) {
+				resp = "," + resp
+			} else if i == 0 {
+				resp = "[" + resp
+			}
+		}
+		_, err = respFinal.WriteString(resp)
 		if err != nil {
+			log.Println("error writing response into response buffer: ", err.Error())
 			return err
 		}
-		cacheUsed = false
+		// log.Println("resp added: ", resp, " - respFinal: ", respFinal.String())
 	}
-	if cacheUsed && debug {
-		log.Print("\n\n")
-		log.Println(" *** cache was used for the request: ", requestHash)
-		log.Print("\n\n")
+	if len(requests) > 1 {
+		respFinal.WriteString("]")
 	}
-	return echoCtx.String(http.StatusOK, resp)
+	log.Print("Response:\n", respFinal.String(), "\n\n")
+
+	return echoCtx.String(http.StatusOK, respFinal.String())
 }
 
 func PerformRemoteCall(echoCtx echo.Context, request *model.RPCRequest) (resp string, err error) {

@@ -17,10 +17,14 @@ type RPCRequest struct {
 }
 
 func (rpc *RPCRequest) ToByte() (data []byte) {
-	tmpId := rpc.ID
-	rpc.ID = 1
+	// TODO: optimize the response removing ID from hash generation
+	// but update it back to the original ID of the call
+	// to allow it to be compatible with Ethers
+	// tmpId := rpc.ID
+	// rpc.ID = 1
+	// data, _ = json.Marshal(rpc)
+	// rpc.ID = tmpId
 	data, _ = json.Marshal(rpc)
-	rpc.ID = tmpId
 	return
 }
 
