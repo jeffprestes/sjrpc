@@ -18,6 +18,10 @@ This project is not for you. Period.
 Using an embedded and local [BadgerDB](https://github.com/dgraph-io/badger) database, **sjrpc** hashes the Request,
 uses the request hash as Key, perform the remote JSON-RPC call and saves the remote response locally. At next call it gets the content from the local database.
 
+## Security
+
+As it keeps the cache data locally, your project does not face a risk to get tampered data. We do not recommend you expose it externally.
+
 ## Installation
 
 ### Download
