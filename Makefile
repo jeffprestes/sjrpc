@@ -1,5 +1,5 @@
 BINARY_NAME=sjrpc
-VERSION=v0.1.1
+VERSION=v0.1.2
 
 build:
 	go build -o bin/${BINARY_NAME} cmd/main.go
@@ -17,7 +17,10 @@ build-linux:
 build-windows:
 	GOOS=windows GOARCH=amd64 go build -o downloads/${BINARY_NAME}-${VERSION}-windows-amd64.exe cmd/main.go
 
-build-distro: build-mac-m1 build-mac-intel build-linux build-windows
+build-distro: clean-distro build-mac-m1 build-mac-intel build-linux build-windows
+
+clean-distro:
+	rm downloads/*
 
 clean:
 	rm database/data/*
