@@ -2,6 +2,8 @@
 
 **sjrpc** or **Save JSON-RPC** is a Reverse Proxy focused on to reduce remote Ethereum/Web3 JSON-RPC calls to thrid-party nodes.
 
+It is the NGINX for Ethereum JSON-RPC APIs
+
 Let us save your time, if you use:
 
 ```javascript
