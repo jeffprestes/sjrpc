@@ -19,6 +19,9 @@ build-windows:
 
 build-distro: build-mac-m1 build-mac-intel build-linux build-windows
 
+clean:
+	rm database/data/*
+
 run: build 
 	./bin/${BINARY_NAME}
 
