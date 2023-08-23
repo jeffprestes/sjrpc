@@ -123,6 +123,9 @@ func PostHandler(echoCtx echo.Context) error {
 			if !ok {
 				respObj, err = PerformRemoteCallForTimelyEndpoints(echoCtx, &request, rpcUrl)
 				if err != nil {
+					if debug {
+						log.Printf("request.IsTimelyCacheable - PerformRemoteCallForTimelyEndpoints: %s\n", err.Error())
+					}
 					return err
 				}
 				localcache.TimelyRequests.Store(request.Base64Hash(userSelectedChainId), respObj)
@@ -154,6 +157,7 @@ func PostHandler(echoCtx echo.Context) error {
 			}
 			cacheUsed = false
 		}
+
 		if cacheUsed && debug {
 			log.Print("\n\n")
 			log.Println(" *** cache was used for the request: ", requestHash)
@@ -247,8 +251,10 @@ func PerformRemoteCallForTimelyEndpoints(echoCtx echo.Context, request *model.RP
 	}
 	respObj.BlockNumber = ConvertStrRespToUInt64(lastBlock.Result.Number)
 	if respObj.BlockNumber < 1000 {
-		err = fmt.Errorf("could not convert block number to int: %s", lastBlock.Result.Number)
-		return
+		if !strings.Contains(rpcUrl, "localhost") && !strings.Contains(rpcUrl, "127.0.0.1") {
+			err = fmt.Errorf("could not convert block number to int: %s", lastBlock.Result.Number)
+			return
+		}
 	}
 	respObj.When = ConvertStrRespToInt64(lastBlock.Result.Timestamp)
 	if respObj.When < 1000 {
@@ -274,11 +280,16 @@ func ConvertStrRespToInt64(strNumber string) (value int64) {
 }
 
 func ConvertStrRespToUInt64(strNumber string) (value uint64) {
-	tmpStr, _ := strings.CutPrefix(strNumber, "0x")
+	tmpStr, found := strings.CutPrefix(strNumber, "0x")
+	if !found {
+		value = 0
+	}
+	tmpStr = strings.TrimSpace(tmpStr)
 	tmpInt, ok := new(big.Int).SetString(tmpStr, 16)
 	if ok {
 		value = tmpInt.Uint64()
 	}
+	// log.Println("ConvertStrRespToUInt64 - strNumber: ", strNumber, " - found: ", found, " - tmpStr: ", tmpStr, " - ok: ", ok, " - tmpInt: ", tmpInt, " - value: ", value)
 	return
 }
 
