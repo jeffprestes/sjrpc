@@ -107,4 +107,6 @@ It runs better in 64-bit architect processors, such M1/M2 Apple chips, or Intel 
 
 ### Acknowledgments
 
+Thanks to @semaraugusto for helping to fix ethers calls.
+
 Built with ❤️ using [Go / Golang](https://golang.dev)
