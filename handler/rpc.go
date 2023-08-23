@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -158,13 +159,16 @@ func PostHandler(echoCtx echo.Context) error {
 			log.Println(" *** cache was used for the request: ", requestHash)
 			log.Print("\n\n")
 		}
+
 		if len(requests) > 1 {
+			resp = RestoreOriginalId(&request, resp)
 			if i > 0 && i < len(requests) {
 				resp = "," + resp
 			} else if i == 0 {
 				resp = "[" + resp
 			}
 		}
+
 		_, err = respFinal.WriteString(resp)
 		if err != nil {
 			log.Println("error writing response into response buffer: ", err.Error())
@@ -323,5 +327,16 @@ func CheckParams(echoCtx echo.Context) (debug bool, chainId *int, rpcUrl string)
 			}
 		}
 	}
+	return
+}
+
+func RestoreOriginalId(request *model.RPCRequest, resp string) (newResp string) {
+	exp := "\"id\":[0-9]+"
+	re, err := regexp.CompilePOSIX(exp)
+	if err != nil {
+		return
+	}
+	tmpId := "\"id\":" + strconv.Itoa(request.ID)
+	newResp = re.ReplaceAllString(resp, tmpId)
 	return
 }
