@@ -16,27 +16,27 @@ type RPCRequest struct {
 	ID             int    `json:"id"`
 }
 
-func (rpc *RPCRequest) ToByte() (data []byte) {
-	// TODO: optimize the response removing ID from hash generation
-	// but update it back to the original ID of the call
-	// to allow it to be compatible with Ethers
-	// tmpId := rpc.ID
-	// rpc.ID = 1
-	// data, _ = json.Marshal(rpc)
-	// rpc.ID = tmpId
+func (rpc *RPCRequest) ToByte(userSelectedChainId *int) (data []byte) {
+	tmpId := rpc.ID
+	if userSelectedChainId == nil {
+		rpc.ID = 1
+	} else {
+		rpc.ID = *userSelectedChainId
+	}
 	data, _ = json.Marshal(rpc)
+	rpc.ID = tmpId
 	return
 }
 
-func (rpc *RPCRequest) Hash() (hash []byte) {
-	data := rpc.ToByte()
+func (rpc *RPCRequest) Hash(userSelectedChainId *int) (hash []byte) {
+	data := rpc.ToByte(userSelectedChainId)
 	tmp := blake2b.Sum512(data)
 	hash = tmp[:] // blake2b.Sum2
 	return
 }
 
-func (rpc *RPCRequest) Base64Hash() (hash string) {
-	byteHash := rpc.Hash()
+func (rpc *RPCRequest) Base64Hash(userSelectedChainId *int) (hash string) {
+	byteHash := rpc.Hash(userSelectedChainId)
 	hash = base64.StdEncoding.EncodeToString(byteHash)
 	return
 }
