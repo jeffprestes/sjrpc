@@ -1,5 +1,5 @@
 BINARY_NAME=sjrpc
-VERSION=v0.1.2
+VERSION=v0.1.3
 
 build:
 	go build -o bin/${BINARY_NAME} cmd/main.go
