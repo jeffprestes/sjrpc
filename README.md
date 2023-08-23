@@ -4,7 +4,7 @@
 
 It is the NGINX for Ethereum JSON-RPC APIs
 
-Let us save your time, if you use:
+However, let us save your time, if you use:
 
 ```javascript
 // Example of Javascript/Typescript static frontend getting Ethereum RPC connection via browser embedded connection, such as Metamask
