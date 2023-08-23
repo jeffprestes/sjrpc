@@ -20,8 +20,9 @@ import (
 )
 
 var (
-	RpcUrl string
-	debug  bool
+	RpcUrl              string
+	debug               bool
+	userSelectedChainId *int
 )
 
 func init() {
@@ -29,10 +30,14 @@ func init() {
 		log.Fatalln("no SJRPC_URL server set in environment variable")
 	}
 	RpcUrl = os.Getenv("SJRPC_URL")
-	debug = true
 }
 
 func PostHandler(echoCtx echo.Context) error {
+	if echoCtx.QueryParam("debug") == "1" ||
+		strings.ToLower(echoCtx.QueryParam("debug")) == "true" {
+		debug = true
+	}
+
 	var err error
 	echoCtx.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
 
@@ -62,7 +67,9 @@ func PostHandler(echoCtx echo.Context) error {
 			log.Printf("decoding request error: %s\n", errDecode.Error())
 			return errDecode
 		}
-		log.Println("Number of requests: ", len(requests))
+		if debug {
+			log.Println("Number of requests: ", len(requests))
+		}
 	} else {
 		requests = append(requests, request)
 	}
@@ -136,7 +143,9 @@ func PostHandler(echoCtx echo.Context) error {
 					}
 					_, swapped := localcache.TimelyRequests.Swap(request.Base64Hash(), respObj)
 					if swapped {
-						log.Println(request.Base64Hash(), " has been updated")
+						if debug {
+							log.Println(request.Base64Hash(), " has been updated")
+						}
 					}
 					cacheUsed = false
 				}
@@ -166,12 +175,17 @@ func PostHandler(echoCtx echo.Context) error {
 			log.Println("error writing response into response buffer: ", err.Error())
 			return err
 		}
-		// log.Println("resp added: ", resp, " - respFinal: ", respFinal.String())
+		if debug {
+			log.Println("resp added: ", resp, " - respFinal: ", respFinal.String())
+		}
 	}
 	if len(requests) > 1 {
 		respFinal.WriteString("]")
 	}
-	log.Print("Response:\n", respFinal.String(), "\n\n")
+
+	if debug {
+		log.Print("Response:\n", respFinal.String(), "\n\n")
+	}
 
 	return echoCtx.String(http.StatusOK, respFinal.String())
 }
